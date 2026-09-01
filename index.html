@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎬 Nossos Filmes</title>
+<style>
+  :root{
+    --bg: #0e0e14;
+    --bg-soft: #15151f;
+    --card: #1a1a26;
+    --card-border: #2a2a3a;
+    --text: #eae8f2;
+    --text-dim: #9491ab;
+    --gold: #e5b84b;
+    --purple: #8b5cf6;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --green: #22c55e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: radial-gradient(circle at 20% 0%, #1c1830 0%, var(--bg) 45%);
+    color: var(--text);
+    min-height:100vh;
+    padding-bottom: 60px;
+  }
+  header{
+    padding: 32px 24px 16px;
+    text-align:center;
+  }
+  header h1{
+    font-size: 2rem;
+    margin:0;
+    background: linear-gradient(90deg, var(--gold), var(--purple));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color: transparent;
+    letter-spacing: 1px;
+  }
+  header p{ color: var(--text-dim); margin-top:6px; font-size:.9rem; }
+
+  .container{ max-width: 900px; margin: 0 auto; padding: 0 20px; }
+
+  /* Tabs */
+  .tabs{
+    display:flex; gap:8px; margin: 24px 0 8px; border-bottom: 1px solid var(--card-border);
+  }
+  .tab-btn{
+    background:transparent; border:none; color: var(--text-dim);
+    padding: 10px 18px; font-size: .95rem; font-weight:600; cursor:pointer;
+    border-bottom: 2px solid transparent; border-radius: 0;
+  }
+  .tab-btn:hover{ color: var(--text); transform:none; opacity:1; }
+  .tab-btn.active{ color: var(--gold); border-bottom-color: var(--gold); }
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  .search-box{
+    display:flex; gap:10px; margin: 20px 0;
+  }
+  .search-box input{
+    flex:1;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: var(--bg-soft);
+    color: var(--text);
+    font-size: 1rem;
+    outline:none;
+  }
+  .search-box input:focus{ border-color: var(--purple); }
+  select{
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--card-border);
+    background: var(--bg-soft); color: var(--text); font-size: .9rem; outline:none;
+  }
+  button{
+    cursor:pointer;
+    border:none;
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: .95rem;
+    font-weight:600;
+    transition: transform .15s ease, opacity .15s ease;
+  }
+  button:hover{ transform: translateY(-1px); opacity:.92; }
+  .btn-primary{ background: linear-gradient(90deg, var(--purple), #6d28d9); color:#fff; }
+  .btn-ghost{ background: var(--bg-soft); color: var(--text-dim); border: 1px solid var(--card-border); }
+  .btn-danger{ background: #3a1a1f; color: var(--red); border: 1px solid #5c2530; padding: 8px 12px; font-size:.85rem;}
+  .btn-small{ padding: 8px 12px; font-size: .85rem; }
+
+  .results-list{ display:flex; flex-direction:column; gap:8px; margin-bottom: 20px; }
+  .result-item{
+    display:flex; align-items:center; gap:12px;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 8px 12px; cursor:pointer;
+  }
+  .result-item:hover{ border-color: var(--purple); }
+  .result-item img{ width:40px; height:60px; object-fit:cover; border-radius:4px; background:#222; }
+  .result-item .meta{ font-size:.8rem; color:var(--text-dim); }
+  .hint{ color: var(--text-dim); font-size: .85rem; margin: 6px 0 16px; }
+
+  .movie-form{
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 30px;
+    display:none;
+  }
+  .movie-form.active{ display:block; }
+  .movie-head{ display:flex; gap:16px; }
+  .movie-head img{ width:100px; height:150px; object-fit:cover; border-radius:8px; background:#222; flex-shrink:0; }
+  .movie-head h2{ margin:0 0 6px; font-size:1.3rem; }
+  .movie-head .year{ color: var(--text-dim); font-size:.85rem; margin-bottom:6px; }
+  .movie-head .synopsis{ font-size:.88rem; color: var(--text-dim); line-height:1.5; max-height: 110px; overflow-y:auto; }
+  .genre-tag{ display:inline-block; font-size:.72rem; padding:2px 8px; border-radius:20px; background:#2a2340; color:var(--purple); margin-top:6px; }
+
+  .horror-toggle{
+    margin: 16px 0; display:flex; align-items:center; gap:8px;
+    font-size: .88rem; color: var(--text-dim);
+  }
+
+  .ratings{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media(max-width:600px){ .ratings{ grid-template-columns: 1fr; } .movie-head{ flex-direction:column; } .movie-head img{ width:80px; height:120px; } }
+
+  .rating-item label{ display:flex; justify-content:space-between; font-size:.85rem; margin-bottom:4px; }
+  .rating-item label .val{ font-weight:700; padding: 1px 8px; border-radius: 8px; font-size: .8rem; }
+  input[type=range]{
+    width:100%;
+    accent-color: var(--purple);
+  }
+
+  .avg-preview{
+    margin-top: 20px; padding: 14px; border-radius: 12px;
+    background: var(--bg-soft); display:flex; align-items:center; justify-content:space-between;
+  }
+  .avg-preview .label{ color: var(--text-dim); font-size: .9rem; }
+  .avg-badge{
+    font-size: 1.4rem; font-weight: 800; padding: 6px 16px; border-radius: 12px;
+  }
+
+  .form-actions{ display:flex; gap:10px; margin-top: 18px; justify-content:flex-end; flex-wrap:wrap; }
+
+  .section-title{
+    font-size: 1.1rem; margin: 30px 0 14px; color: var(--text);
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-title .count{ color: var(--text-dim); font-size:.85rem; font-weight:400; }
+
+  .movies-grid{
+    display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;
+  }
+  .movie-card{
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
+    overflow:hidden; display:flex; flex-direction:column; cursor:pointer;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .movie-card:hover{ border-color: var(--purple); transform: translateY(-2px); }
+  .movie-card .poster-wrap{ position:relative; }
+  .movie-card img{ width:100%; height:230px; object-fit:cover; display:block; background:#222; }
+  .movie-card .avg-chip{
+    position:absolute; top:8px; right:8px; padding: 3px 10px; border-radius: 20px;
+    font-weight:800; font-size: .9rem; box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  }
+  .movie-card .body{ padding: 12px; flex:1; display:flex; flex-direction:column; gap:8px; }
+  .movie-card h3{ margin:0; font-size: 1rem; }
+  .movie-card .year{ color: var(--text-dim); font-size: .8rem; }
+  .movie-card .mini-scores{ display:flex; flex-wrap:wrap; gap:6px; font-size:.72rem; color: var(--text-dim); }
+  .movie-card .mini-scores span b{ color: var(--text); }
+  .movie-card .card-actions{ display:flex; justify-content:flex-end; margin-top:auto; }
+
+  .empty-state{ text-align:center; color: var(--text-dim); padding: 40px 0; }
+
+  footer{ text-align:center; color: var(--text-dim); font-size:.78rem; margin-top: 50px; }
+
+  /* Modal (detalhes / revisão) */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background: rgba(5,5,10,.72);
+    z-index: 100; align-items:flex-start; justify-content:center; padding: 40px 16px; overflow-y:auto;
+  }
+  .modal-overlay.active{ display:flex; }
+  .modal-box{
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 16px;
+    padding: 22px; max-width: 640px; width:100%; position:relative;
+  }
+  .modal-close{
+    position:absolute; top:14px; right:14px; background: var(--bg-soft); color: var(--text-dim);
+    border:none; border-radius:50%; width:32px; height:32px; font-size:1rem; padding:0; line-height:1;
+  }
+  .readonly-badges{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  @media(max-width:600px){ .readonly-badges{ grid-template-columns: 1fr; } }
+  .readonly-badges .rb-item{
+    display:flex; justify-content:space-between; align-items:center;
+    background: var(--bg-soft); border-radius: 10px; padding: 10px 14px; font-size:.9rem;
+  }
+  .readonly-badges .rb-item .rb-val{ font-weight:800; padding: 2px 10px; border-radius: 8px; }
+
+  /* Ranking */
+  .ranking-controls{ display:flex; align-items:center; gap:10px; margin: 18px 0; flex-wrap:wrap; }
+  .ranking-controls label{ font-size:.85rem; color: var(--text-dim); }
+  .ranking-list{ display:flex; flex-direction:column; gap:10px; }
+  .rank-row{
+    display:flex; align-items:center; gap:14px;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 10px 14px; cursor:pointer;
+  }
+  .rank-row:hover{ border-color: var(--purple); }
+  .rank-pos{
+    width: 34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:.95rem; background: var(--bg-soft); color: var(--gold); flex-shrink:0;
+  }
+  .rank-row:nth-child(1) .rank-pos{ background: linear-gradient(135deg,#e5b84b,#a6791f); color:#1a1400; }
+  .rank-row:nth-child(2) .rank-pos{ background: linear-gradient(135deg,#c9c9d6,#8a8a99); color:#1a1a1a; }
+  .rank-row:nth-child(3) .rank-pos{ background: linear-gradient(135deg,#c98a4b,#7a4a1f); color:#1a1000; }
+  .rank-row img{ width:44px; height:64px; object-fit:cover; border-radius:6px; background:#222; flex-shrink:0; }
+  .rank-info{ flex:1; min-width:0; }
+  .rank-info h4{ margin:0; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rank-info .rank-meta{ color: var(--text-dim); font-size:.75rem; }
+  .rank-avg{ font-weight:800; padding: 4px 12px; border-radius: 10px; font-size:1rem; flex-shrink:0; }
+  .rank-tiebreak{ font-size:.72rem; color: var(--text-dim); flex-shrink:0; text-align:right; min-width:70px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎬 Filmes Ny e Theus</h1>
+  <p>Nossa coleção pessoal de avaliações — roteiro, história, trilha sonora, final e plot twist.</p>
+</header>
+
+<div class="container">
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tabFilmes">📚 Meus Filmes</button>
+    <button class="tab-btn" data-tab="tabRanking">🏆 Ranking</button>
+  </div>
+
+  <!-- ===================== TAB: MEUS FILMES ===================== -->
+  <div class="tab-panel active" id="tabFilmes">
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Buscar filme (ex: A Origem)..." />
+      <button class="btn-primary" id="searchBtn">Buscar</button>
+      <button class="btn-ghost" id="manualBtn">+ Manual</button>
+    </div>
+    <div id="searchError" class="hint" style="display:none;"></div>
+    <div id="resultsList" class="results-list"></div>
+
+    <!-- Formulário de nova avaliação -->
+    <div class="movie-form" id="movieForm">
+      <div class="movie-head">
+        <img id="mPoster" src="" alt="poster" onerror="this.style.opacity=0.2">
+        <div>
+          <h2 id="mTitle">—</h2>
+          <div class="year" id="mYear"></div>
+          <div class="synopsis" id="mSynopsis"></div>
+          <div id="mGenre"></div>
+        </div>
+      </div>
+
+      <div class="horror-toggle">
+        <input type="checkbox" id="isHorror">
+        <label for="isHorror">É filme de terror? (avaliar também "Medo")</label>
+      </div>
+
+      <div class="ratings" id="ratingsGrid"></div>
+
+      <div class="avg-preview">
+        <span class="label">Média geral</span>
+        <span class="avg-badge" id="avgPreview">0.0</span>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-ghost" id="cancelBtn">Cancelar</button>
+        <button class="btn-primary" id="saveBtn">Salvar avaliação</button>
+      </div>
+    </div>
+
+    <div class="section-title">📚 Filmes avaliados <span class="count" id="movieCount"></span></div>
+    <div class="movies-grid" id="moviesGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">Nenhum filme avaliado ainda. Busque um filme acima para começar!</div>
+  </div>
+
+  <!-- ===================== TAB: RANKING ===================== -->
+  <div class="tab-panel" id="tabRanking">
+    <div class="ranking-controls">
+      <label for="tiebreakSelect">Critério de desempate (quando a média for igual):</label>
+      <select id="tiebreakSelect">
+        <option value="roteiro">Roteiro</option>
+        <option value="historia">História</option>
+        <option value="trilha_sonora">Trilha Sonora</option>
+        <option value="final">Final</option>
+        <option value="plot_twist">Plot Twist</option>
+        <option value="medo">Medo (terror)</option>
+        <option value="year_desc">Ano mais recente</option>
+        <option value="year_asc">Ano mais antigo</option>
+        <option value="alpha">Ordem alfabética</option>
+      </select>
+    </div>
+    <div class="ranking-list" id="rankingList"></div>
+    <div class="empty-state" id="rankingEmpty" style="display:none;">Avalie ao menos um filme para ver o ranking.</div>
+  </div>
+
+</div>
+
+<!-- ===================== MODAL: DETALHE / REVISÃO ===================== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <button class="modal-close" id="detailClose">✕</button>
+    <div class="movie-head">
+      <img id="dPoster" src="" alt="poster" onerror="this.style.opacity=0.2">
+      <div>
+        <h2 id="dTitle">—</h2>
+        <div class="year" id="dYear"></div>
+        <div class="synopsis" id="dSynopsis"></div>
+        <div id="dGenre"></div>
+      </div>
+    </div>
+
+    <!-- Modo leitura -->
+    <div id="detailReadOnly">
+      <div class="readonly-badges" id="dReadonlyBadges"></div>
+      <div class="avg-preview">
+        <span class="label">Média geral</span>
+        <span class="avg-badge" id="dAvg">0.0</span>
+      </div>
+      <div class="form-actions">
+        <button class="btn-danger" id="dDeleteBtn">Excluir</button>
+        <button class="btn-ghost" id="dCloseBtn">Fechar</button>
+        <button class="btn-primary" id="dEditBtn">✏️ Editar avaliação</button>
+      </div>
+    </div>
+
+    <!-- Modo edição (reaproveita sliders) -->
+    <div id="detailEdit" style="display:none;">
+      <div class="horror-toggle">
+        <input type="checkbox" id="dIsHorror">
+        <label for="dIsHorror">É filme de terror? (avaliar também "Medo")</label>
+      </div>
+      <div class="ratings" id="dRatingsGrid"></div>
+      <div class="avg-preview">
+        <span class="label">Média geral</span>
+        <span class="avg-badge" id="dAvgPreview">0.0</span>
+      </div>
+      <div class="form-actions">
+        <button class="btn-ghost" id="dCancelEditBtn">Cancelar edição</button>
+        <button class="btn-primary" id="dSaveBtn">Salvar alterações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>rodando localmente • dados salvos em movies.db</footer>
+
+<script>
+const CATEGORIES = [
+  { key: "roteiro", label: "Roteiro" },
+  { key: "historia", label: "História" },
+  { key: "trilha_sonora", label: "Trilha Sonora" },
+  { key: "final", label: "Final" },
+  { key: "plot_twist", label: "Plot Twist" },
+];
+
+let currentMovie = null;   // dados do filme sendo AVALIADO PELA PRIMEIRA VEZ
+let detailMovie = null;    // filme aberto no modal de detalhe/edição
+let allMoviesCache = [];   // último resultado de /api/movies
+
+function scoreColor(v){
+  if (v === null || v === undefined) return "#555";
+  if (v < 4) return "var(--red)";
+  if (v < 7) return "var(--orange)";
+  if (v < 8.5) return "#a3e635";
+  return "var(--green)";
+}
+
+// ---------- Tabs ----------
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "tabRanking") renderRanking();
+  });
+});
+
+// ============================================================
+// FORMULÁRIO DE NOVA AVALIAÇÃO (fluxo de busca)
+// ============================================================
+
+function buildRatingsGrid(gridEl, existing, horrorCheckboxEl){
+  gridEl.innerHTML = "";
+  CATEGORIES.forEach(cat => addRatingRow(gridEl, cat.key, cat.label, existing ? existing[cat.key] : 5));
+  updateHorrorField(gridEl, horrorCheckboxEl, existing ? existing.medo : 5);
+}
+
+function addRatingRow(grid, key, label, value){
+  value = value === null || value === undefined ? 5 : value;
+  const div = document.createElement("div");
+  div.className = "rating-item";
+  div.dataset.key = key;
+  div.innerHTML = `
+    <label>${label} <span class="val" style="background:${scoreColor(value)}22;color:${scoreColor(value)}">${Number(value).toFixed(1)}</span></label>
+    <input type="range" min="0" max="10" step="0.5" value="${value}" data-key="${key}">
+  `;
+  grid.appendChild(div);
+  const input = div.querySelector("input");
+  input.addEventListener("input", () => {
+    const v = parseFloat(input.value);
+    const valSpan = div.querySelector(".val");
+    valSpan.textContent = v.toFixed(1);
+    valSpan.style.background = scoreColor(v) + "22";
+    valSpan.style.color = scoreColor(v);
+    updateAvgPreviewFor(grid);
+  });
+}
+
+function updateHorrorField(gridEl, horrorCheckboxEl, medoValue){
+  const already = gridEl.querySelector('[data-key="medo"]');
+  const isHorror = horrorCheckboxEl.checked;
+  if (isHorror && !already){
+    addRatingRow(gridEl, "medo", "Medo (só terror)", medoValue ?? 5);
+  } else if (!isHorror && already){
+    already.remove();
+  }
+  updateAvgPreviewFor(gridEl);
+}
+
+function collectRatings(gridEl){
+  const out = {};
+  gridEl.querySelectorAll("input[type=range]").forEach(inp => {
+    out[inp.dataset.key] = parseFloat(inp.value);
+  });
+  return out;
+}
+
+function computeAvg(ratings){
+  const vals = Object.values(ratings);
+  return vals.length ? (vals.reduce((a,b)=>a+b,0) / vals.length) : 0;
+}
+
+function updateAvgPreviewFor(gridEl){
+  const ratings = collectRatings(gridEl);
+  const avg = computeAvg(ratings);
+  const badgeId = gridEl.id === "ratingsGrid" ? "avgPreview" : "dAvgPreview";
+  const badge = document.getElementById(badgeId);
+  badge.textContent = avg.toFixed(1);
+  badge.style.background = scoreColor(avg) + "22";
+  badge.style.color = scoreColor(avg);
+}
+
+document.getElementById("isHorror").addEventListener("change", () =>
+  updateHorrorField(document.getElementById("ratingsGrid"), document.getElementById("isHorror"), 5));
+
+function openForm(movie){
+  currentMovie = movie;
+  document.getElementById("mPoster").src = movie.poster || "https://placehold.co/100x150/1a1a26/555?text=%3F";
+  document.getElementById("mTitle").textContent = movie.title;
+  document.getElementById("mYear").textContent = movie.year || "";
+  document.getElementById("mSynopsis").textContent = movie.synopsis || "Sem sinopse disponível — você pode avaliar mesmo assim.";
+  document.getElementById("mGenre").innerHTML = movie.genre ? `<span class="genre-tag">${movie.genre}</span>` : "";
+  document.getElementById("isHorror").checked = !!movie.is_horror;
+  buildRatingsGrid(document.getElementById("ratingsGrid"), null, document.getElementById("isHorror"));
+  document.getElementById("movieForm").classList.add("active");
+  document.getElementById("movieForm").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function closeForm(){
+  document.getElementById("movieForm").classList.remove("active");
+  currentMovie = null;
+  document.getElementById("resultsList").innerHTML = "";
+  document.getElementById("searchInput").value = "";
+}
+
+document.getElementById("cancelBtn").addEventListener("click", closeForm);
+
+document.getElementById("manualBtn").addEventListener("click", () => {
+  const title = prompt("Nome do filme:");
+  if (!title) return;
+  const year = prompt("Ano (opcional):") || "";
+  const synopsis = prompt("Sinopse (opcional):") || "";
+  openForm({ title, year, synopsis, poster: null, genre: "", is_horror: false });
+});
+
+// ---------- Busca ----------
+async function doSearch(){
+  const q = document.getElementById("searchInput").value.trim();
+  const errBox = document.getElementById("searchError");
+  errBox.style.display = "none";
+  if (!q) return;
+  const resultsList = document.getElementById("resultsList");
+  resultsList.innerHTML = "<div class='hint'>Buscando...</div>";
+  try{
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    resultsList.innerHTML = "";
+    if (data.error){
+      errBox.textContent = data.error;
+      errBox.style.display = "block";
+    }
+    if (!data.results || data.results.length === 0){
+      if (!data.error) resultsList.innerHTML = "<div class='hint'>Nenhum resultado. Tente 'Adicionar manualmente'.</div>";
+      return;
+    }
+    data.results.forEach(r => {
+      const item = document.createElement("div");
+      item.className = "result-item";
+      item.innerHTML = `
+        <img src="${r.poster || 'https://placehold.co/40x60/1a1a26/555?text=%3F'}">
+        <div>
+          <div>${r.title}</div>
+          <div class="meta">${r.year}</div>
+        </div>
+      `;
+      item.addEventListener("click", () => selectResult(r.imdb_id));
+      resultsList.appendChild(item);
+    });
+  }catch(e){
+    errBox.textContent = "Erro ao buscar. Verifique se o servidor está rodando.";
+    errBox.style.display = "block";
+    resultsList.innerHTML = "";
+  }
+}
+
+async function selectResult(imdbId){
+  const res = await fetch(`/api/movie/${imdbId}`);
+  const data = await res.json();
+  if (data.error){ alert(data.error); return; }
+  openForm(data);
+}
+
+document.getElementById("searchBtn").addEventListener("click", doSearch);
+document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+
+// ---------- Salvar nova avaliação ----------
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  if (!currentMovie) return;
+  const ratings = collectRatings(document.getElementById("ratingsGrid"));
+  const payload = {
+    title: currentMovie.title,
+    year: currentMovie.year,
+    imdb_id: currentMovie.imdb_id || null,
+    poster_url: currentMovie.poster || null,
+    synopsis: currentMovie.synopsis || null,
+    genre: currentMovie.genre || null,
+    is_horror: document.getElementById("isHorror").checked,
+    roteiro: ratings.roteiro,
+    historia: ratings.historia,
+    trilha_sonora: ratings.trilha_sonora,
+    final: ratings.final,
+    plot_twist: ratings.plot_twist,
+    medo: ratings.medo ?? null,
+  };
+  await fetch("/api/movies", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+  closeForm();
+  loadMovies();
+});
+
+// ============================================================
+// LISTAGEM (grade "Meus Filmes")
+// ============================================================
+async function loadMovies(){
+  const res = await fetch("/api/movies");
+  const movies = await res.json();
+  allMoviesCache = movies;
+  const grid = document.getElementById("moviesGrid");
+  const empty = document.getElementById("emptyState");
+  const count = document.getElementById("movieCount");
+  count.textContent = movies.length ? `(${movies.length})` : "";
+  grid.innerHTML = "";
+  empty.style.display = movies.length ? "none" : "block";
+
+  movies.forEach(m => {
+    const card = document.createElement("div");
+    card.className = "movie-card";
+    const c = scoreColor(m.average);
+    const miniScores = CATEGORIES.map(cat => `<span>${cat.label[0]}: <b>${m[cat.key] != null ? m[cat.key] : "-"}</b></span>`).join("");
+    card.innerHTML = `
+      <div class="poster-wrap">
+        <img src="${m.poster_url || 'https://placehold.co/220x230/1a1a26/555?text=%3F'}">
+        <div class="avg-chip" style="background:${c}22;color:${c}">${m.average != null ? m.average.toFixed(1) : "-"}</div>
+      </div>
+      <div class="body">
+        <h3>${m.title}</h3>
+        <div class="year">${m.year || ""}${m.is_horror ? " · 😱 terror" : ""}</div>
+        <div class="mini-scores">${miniScores}</div>
+        <div class="card-actions">
+          <button class="btn-danger btn-small" data-id="${m.id}">Excluir</button>
+        </div>
+      </div>
+    `;
+    card.addEventListener("click", () => openDetailModal(m));
+    card.querySelector(".btn-danger").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Excluir "${m.title}"?`)) return;
+      await fetch(`/api/movies/${m.id}`, { method: "DELETE" });
+      loadMovies();
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ============================================================
+// MODAL DE DETALHE / REVISÃO / EDIÇÃO
+// ============================================================
+function openDetailModal(m){
+  detailMovie = m;
+  document.getElementById("dPoster").src = m.poster_url || "https://placehold.co/100x150/1a1a26/555?text=%3F";
+  document.getElementById("dTitle").textContent = m.title;
+  document.getElementById("dYear").textContent = m.year || "";
+  document.getElementById("dSynopsis").textContent = m.synopsis || "Sem sinopse disponível.";
+  document.getElementById("dGenre").innerHTML = m.genre ? `<span class="genre-tag">${m.genre}</span>` : "";
+
+  // badges somente-leitura
+  const badgesEl = document.getElementById("dReadonlyBadges");
+  let cats = [...CATEGORIES];
+  if (m.is_horror) cats = [...cats, { key: "medo", label: "Medo" }];
+  badgesEl.innerHTML = cats.map(cat => {
+    const v = m[cat.key];
+    const color = scoreColor(v);
+    return `<div class="rb-item"><span>${cat.label}</span><span class="rb-val" style="background:${color}22;color:${color}">${v != null ? Number(v).toFixed(1) : "-"}</span></div>`;
+  }).join("");
+
+  const avgBadge = document.getElementById("dAvg");
+  const c = scoreColor(m.average);
+  avgBadge.textContent = m.average != null ? m.average.toFixed(1) : "0.0";
+  avgBadge.style.background = c + "22";
+  avgBadge.style.color = c;
+
+  document.getElementById("detailReadOnly").style.display = "block";
+  document.getElementById("detailEdit").style.display = "none";
+  document.getElementById("detailModal").classList.add("active");
+}
+
+function closeDetailModal(){
+  document.getElementById("detailModal").classList.remove("active");
+  detailMovie = null;
+}
+
+document.getElementById("detailClose").addEventListener("click", closeDetailModal);
+document.getElementById("dCloseBtn").addEventListener("click", closeDetailModal);
+document.getElementById("detailModal").addEventListener("click", (e) => {
+  if (e.target.id === "detailModal") closeDetailModal();
+});
+
+document.getElementById("dDeleteBtn").addEventListener("click", async () => {
+  if (!detailMovie) return;
+  if (!confirm(`Excluir "${detailMovie.title}"?`)) return;
+  await fetch(`/api/movies/${detailMovie.id}`, { method: "DELETE" });
+  closeDetailModal();
+  loadMovies();
+});
+
+document.getElementById("dEditBtn").addEventListener("click", () => {
+  if (!detailMovie) return;
+  document.getElementById("detailReadOnly").style.display = "none";
+  document.getElementById("detailEdit").style.display = "block";
+  document.getElementById("dIsHorror").checked = !!detailMovie.is_horror;
+  buildRatingsGrid(document.getElementById("dRatingsGrid"), detailMovie, document.getElementById("dIsHorror"));
+});
+
+document.getElementById("dIsHorror").addEventListener("change", () =>
+  updateHorrorField(document.getElementById("dRatingsGrid"), document.getElementById("dIsHorror"), 5));
+
+document.getElementById("dCancelEditBtn").addEventListener("click", () => {
+  document.getElementById("detailEdit").style.display = "none";
+  document.getElementById("detailReadOnly").style.display = "block";
+});
+
+document.getElementById("dSaveBtn").addEventListener("click", async () => {
+  if (!detailMovie) return;
+  const ratings = collectRatings(document.getElementById("dRatingsGrid"));
+  const payload = {
+    is_horror: document.getElementById("dIsHorror").checked,
+    roteiro: ratings.roteiro,
+    historia: ratings.historia,
+    trilha_sonora: ratings.trilha_sonora,
+    final: ratings.final,
+    plot_twist: ratings.plot_twist,
+    medo: ratings.medo ?? null,
+  };
+  await fetch(`/api/movies/${detailMovie.id}`, {
+    method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload)
+  });
+  closeDetailModal();
+  loadMovies();
+});
+
+// ============================================================
+// RANKING
+// ============================================================
+function renderRanking(){
+  const listEl = document.getElementById("rankingList");
+  const emptyEl = document.getElementById("rankingEmpty");
+  const criterion = document.getElementById("tiebreakSelect").value;
+  const movies = [...allMoviesCache];
+
+  if (movies.length === 0){
+    listEl.innerHTML = "";
+    emptyEl.style.display = "block";
+    return;
+  }
+  emptyEl.style.display = "none";
+
+  // Comparadores individuais, reaproveitados na cascata de desempate
+  function cmpByField(a, b, key){
+    const av = a[key], bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;   // sem esse campo (ex: medo em não-terror) fica pra trás
+    if (bv == null) return -1;
+    return bv - av; // maior primeiro
+  }
+  function cmpByYear(a, b, asc){
+    const ay = parseInt(a.year) || 0, by = parseInt(b.year) || 0;
+    return asc ? (ay - by) : (by - ay);
+  }
+  function cmpByAlpha(a, b){
+    return a.title.localeCompare(b.title, "pt-BR");
+  }
+  function cmpByCriterion(a, b, crit){
+    if (crit === "year_desc") return cmpByYear(a, b, false);
+    if (crit === "year_asc") return cmpByYear(a, b, true);
+    if (crit === "alpha") return cmpByAlpha(a, b);
+    return cmpByField(a, b, crit);
+  }
+
+  // Cascata: média -> critério escolhido -> demais categorias -> ano -> alfabética.
+  // Assim dois filmes só ficam de fato empatados se forem idênticos em TUDO.
+  const allNumericKeys = ["roteiro", "historia", "trilha_sonora", "final", "plot_twist", "medo"];
+  const fallbackOrder = [
+    criterion,
+    ...allNumericKeys.filter(k => k !== criterion),
+    "year_desc",
+    "alpha",
+  ];
+
+  movies.sort((a, b) => {
+    const avgDiff = (b.average ?? 0) - (a.average ?? 0);
+    if (Math.abs(avgDiff) > 0.001) return avgDiff;
+    for (const crit of fallbackOrder){
+      const diff = cmpByCriterion(a, b, crit);
+      if (diff !== 0) return diff;
+    }
+    return 0; // empate absoluto em tudo
+  });
+
+  listEl.innerHTML = "";
+  movies.forEach((m, idx) => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+    const c = scoreColor(m.average);
+    let tiebreakLabel = "";
+    if (criterion === "year_desc" || criterion === "year_asc"){
+      tiebreakLabel = m.year ? `Ano: ${m.year}` : "";
+    } else if (criterion === "alpha"){
+      tiebreakLabel = "";
+    } else {
+      const val = m[criterion];
+      const catObj = [...CATEGORIES, {key:"medo", label:"Medo"}].find(c => c.key === criterion);
+      tiebreakLabel = val != null ? `${catObj.label}: ${Number(val).toFixed(1)}` : "";
+    }
+    row.innerHTML = `
+      <div class="rank-pos">${idx + 1}</div>
+      <img src="${m.poster_url || 'https://placehold.co/44x64/1a1a26/555?text=%3F'}">
+      <div class="rank-info">
+        <h4>${m.title}</h4>
+        <div class="rank-meta">${m.year || ""}${m.is_horror ? " · 😱" : ""}</div>
+      </div>
+      <div class="rank-tiebreak">${tiebreakLabel}</div>
+      <div class="rank-avg" style="background:${c}22;color:${c}">${m.average != null ? m.average.toFixed(1) : "-"}</div>
+    `;
+    row.addEventListener("click", () => openDetailModal(m));
+    listEl.appendChild(row);
+  });
+}
+
+document.getElementById("tiebreakSelect").addEventListener("change", renderRanking);
+
+loadMovies();
+</script>
+</body>
+</html>
