@@ -1,9 +1,19 @@
 """
 Meus Filmes - avaliação pessoal de filmes
-Backend Flask + SQLite (persistente em disco, sobrevive a reinícios).
+Backend Flask.
+
+Funciona com dois bancos, escolhidos automaticamente:
+- SQLite local (movies.db) -> quando NÃO existe a variável de ambiente DATABASE_URL.
+  Uso: rodar na sua rede local, sem nuvem.
+- PostgreSQL na nuvem -> quando existe DATABASE_URL (ex: Neon, Supabase, Render Postgres).
+  Uso: hospedar o app na internet com dados persistentes de verdade.
+
+Login (opcional): se as variáveis APP_USERNAME e APP_PASSWORD estiverem definidas,
+o app pede usuário/senha (HTTP Basic Auth) antes de liberar qualquer acesso.
+Se não estiverem definidas, o app fica aberto (bom para uso só na rede local).
 """
-from flask import Flask, request, jsonify, send_from_directory
-import sqlite3
+from flask import Flask, request, jsonify, send_from_directory, Response
+from functools import wraps
 import os
 import requests
 from datetime import datetime
@@ -12,39 +22,119 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "movies.db")
 OMDB_API_KEY = os.environ.get("OMDB_API_KEY", "").strip()
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+IS_PG = bool(DATABASE_URL)
+
+if IS_PG:
+    import psycopg2
+    import psycopg2.extras
+else:
+    import sqlite3
+
+APP_USERNAME = os.environ.get("APP_USERNAME", "").strip()
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "").strip()
+AUTH_ENABLED = bool(APP_USERNAME and APP_PASSWORD)
+
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 
+# ---------- Login (HTTP Basic Auth) ----------
+
+def check_auth(username, password):
+    return username == APP_USERNAME and password == APP_PASSWORD
+
+
+def authenticate():
+    return Response(
+        "Acesso restrito. Informe usuário e senha para continuar.",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Meus Filmes"'},
+    )
+
+
+@app.before_request
+def require_auth():
+    if not AUTH_ENABLED:
+        return  # sem credenciais configuradas -> app aberto (uso local na rede)
+    auth = request.authorization
+    if not auth or not check_auth(auth.username, auth.password):
+        return authenticate()
+
+
+# ---------- Banco de dados (SQLite local OU Postgres na nuvem) ----------
+
 def get_db():
+    if IS_PG:
+        return psycopg2.connect(DATABASE_URL, sslmode="require")
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+def get_cursor(conn):
+    if IS_PG:
+        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    return conn.cursor()
+
+
+def ph(sql):
+    """Converte placeholders '?' (estilo SQLite) para '%s' (estilo Postgres)."""
+    return sql.replace("?", "%s") if IS_PG else sql
+
+
+def row_to_dict(row):
+    return dict(row)
+
+
 def init_db():
     conn = get_db()
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS movies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            year TEXT,
-            imdb_id TEXT,
-            poster_url TEXT,
-            synopsis TEXT,
-            genre TEXT,
-            is_horror INTEGER DEFAULT 0,
-            roteiro REAL,
-            historia REAL,
-            trilha_sonora REAL,
-            final REAL,
-            plot_twist REAL,
-            medo REAL,
-            average REAL,
-            created_at TEXT
+    cur = get_cursor(conn)
+    if IS_PG:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS movies (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                year TEXT,
+                imdb_id TEXT,
+                poster_url TEXT,
+                synopsis TEXT,
+                genre TEXT,
+                is_horror INTEGER DEFAULT 0,
+                roteiro REAL,
+                historia REAL,
+                trilha_sonora REAL,
+                final REAL,
+                plot_twist REAL,
+                medo REAL,
+                average REAL,
+                created_at TEXT
+            )
+            """
         )
-        """
-    )
+    else:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS movies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                year TEXT,
+                imdb_id TEXT,
+                poster_url TEXT,
+                synopsis TEXT,
+                genre TEXT,
+                is_horror INTEGER DEFAULT 0,
+                roteiro REAL,
+                historia REAL,
+                trilha_sonora REAL,
+                final REAL,
+                plot_twist REAL,
+                medo REAL,
+                average REAL,
+                created_at TEXT
+            )
+            """
+        )
     conn.commit()
     conn.close()
 
@@ -138,14 +228,12 @@ def calc_average(fields, is_horror, medo):
     return round(sum(vals) / len(vals), 2)
 
 
-def row_to_dict(row):
-    return dict(row)
-
-
 @app.route("/api/movies", methods=["GET"])
 def list_movies():
     conn = get_db()
-    rows = conn.execute("SELECT * FROM movies ORDER BY created_at DESC").fetchall()
+    cur = get_cursor(conn)
+    cur.execute("SELECT * FROM movies ORDER BY created_at DESC")
+    rows = cur.fetchall()
     conn.close()
     return jsonify([row_to_dict(r) for r in rows])
 
@@ -153,7 +241,9 @@ def list_movies():
 @app.route("/api/movies/<int:movie_id>", methods=["GET"])
 def get_movie(movie_id):
     conn = get_db()
-    row = conn.execute("SELECT * FROM movies WHERE id=?", (movie_id,)).fetchone()
+    cur = get_cursor(conn)
+    cur.execute(ph("SELECT * FROM movies WHERE id=?"), (movie_id,))
+    row = cur.fetchone()
     conn.close()
     if not row:
         return jsonify({"error": "não encontrado"}), 404
@@ -173,22 +263,26 @@ def create_movie():
     average = calc_average([roteiro, historia, trilha_sonora, final, plot_twist], is_horror, medo)
 
     conn = get_db()
-    cur = conn.execute(
-        """
+    cur = get_cursor(conn)
+    sql = """
         INSERT INTO movies
         (title, year, imdb_id, poster_url, synopsis, genre, is_horror,
          roteiro, historia, trilha_sonora, final, plot_twist, medo, average, created_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """,
-        (
-            d.get("title"), d.get("year"), d.get("imdb_id"), d.get("poster_url"),
-            d.get("synopsis"), d.get("genre"), is_horror,
-            roteiro, historia, trilha_sonora, final, plot_twist, medo,
-            average, datetime.now().isoformat(),
-        ),
+    """
+    params = (
+        d.get("title"), d.get("year"), d.get("imdb_id"), d.get("poster_url"),
+        d.get("synopsis"), d.get("genre"), is_horror,
+        roteiro, historia, trilha_sonora, final, plot_twist, medo,
+        average, datetime.now().isoformat(),
     )
+    if IS_PG:
+        cur.execute(ph(sql) + " RETURNING id", params)
+        movie_id = cur.fetchone()["id"]
+    else:
+        cur.execute(sql, params)
+        movie_id = cur.lastrowid
     conn.commit()
-    movie_id = cur.lastrowid
     conn.close()
     return jsonify({"id": movie_id, "average": average}), 201
 
@@ -206,12 +300,13 @@ def update_movie(movie_id):
     average = calc_average([roteiro, historia, trilha_sonora, final, plot_twist], is_horror, medo)
 
     conn = get_db()
-    conn.execute(
-        """
+    cur = get_cursor(conn)
+    cur.execute(
+        ph("""
         UPDATE movies SET roteiro=?, historia=?, trilha_sonora=?, final=?, plot_twist=?,
             is_horror=?, medo=?, average=?
         WHERE id=?
-        """,
+        """),
         (roteiro, historia, trilha_sonora, final, plot_twist, is_horror, medo, average, movie_id),
     )
     conn.commit()
@@ -222,7 +317,8 @@ def update_movie(movie_id):
 @app.route("/api/movies/<int:movie_id>", methods=["DELETE"])
 def delete_movie(movie_id):
     conn = get_db()
-    conn.execute("DELETE FROM movies WHERE id=?", (movie_id,))
+    cur = get_cursor(conn)
+    cur.execute(ph("DELETE FROM movies WHERE id=?"), (movie_id,))
     conn.commit()
     conn.close()
     return "", 204
@@ -230,4 +326,4 @@ def delete_movie(movie_id):
 
 if __name__ == "__main__":
     # host 0.0.0.0 => acessível por qualquer dispositivo na mesma rede local
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=not IS_PG)
