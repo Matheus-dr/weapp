@@ -17,12 +17,68 @@ from functools import wraps
 import os
 import requests
 from datetime import datetime
+from urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "movies.db")
 OMDB_API_KEY = os.environ.get("OMDB_API_KEY", "").strip()
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+def normalize_database_url(url):
+    """
+    Normaliza a DATABASE_URL para o psycopg2.
+
+    Alguns provedores/variáveis de ambiente podem chegar com:
+      ?sslmode
+    em vez de:
+      ?sslmode=require
+
+    Também aceita URLs no formato postgres://.
+    """
+    url = (url or "").strip()
+
+    if not url:
+        return ""
+
+    # psycopg2 trabalha normalmente com o esquema postgresql://.
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+
+    try:
+        parsed = urlsplit(url)
+
+        # Corrige parâmetros de query sem valor, especialmente sslmode.
+        query = parse_qsl(
+            parsed.query,
+            keep_blank_values=True,
+        )
+
+        normalized = []
+        for key, value in query:
+            if key.lower() == "sslmode" and not value:
+                value = "require"
+            normalized.append((key, value))
+
+        # Se sslmode não estiver presente, não força SSL aqui.
+        # O Render/Postgres pode fornecer uma URL que já contenha
+        # todos os parâmetros necessários.
+        new_query = urlencode(normalized)
+
+        return urlunsplit((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            new_query,
+            parsed.fragment,
+        ))
+    except ValueError:
+        # Se a URL não puder ser analisada, devolvemos o valor original
+        # para que o psycopg2 produza a mensagem de erro apropriada.
+        return url
+
+
+DATABASE_URL = normalize_database_url(
+    os.environ.get("DATABASE_URL", "")
+)
 IS_PG = bool(DATABASE_URL)
 
 if IS_PG:
