@@ -65,7 +65,7 @@ def require_auth():
 
 def get_db():
     if IS_PG:
-        return psycopg2.connect(DATABASE_URL, sslmode="require")
+        return psycopg2.connect(DATABASE_URL)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
